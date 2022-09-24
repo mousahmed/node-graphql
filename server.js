@@ -1,78 +1,30 @@
+const path = require("path");
 const express = require("express");
-const {buildSchema} = require("graphql");
-const {graphqlHTTP} = require("express-graphql");
+const {loadFilesSync} = require("@graphql-tools/load-files");
+const {makeExecutableSchema} = require("@graphql-tools/schema");
+const {ApolloServer} = require("apollo-server-express");
 
-const schema = buildSchema(`
-    type Query {
-        products: [Product]
-        orders: [Order]
-    }
+const typesArray = loadFilesSync(path.join(__dirname, "**/*.graphql"));
+const resolversArray = loadFilesSync(path.join(__dirname, "**/*.resolvers.js"));
 
-    type Product{
-        id: ID!
-        description: String!
-        price: Float!
-        reviews: [Review]
-    }
+async function startApolloServer() {
+	const app = express();
 
-    type Review{
-        rating: Int!
-        comment: String
-    }
+	const schema = makeExecutableSchema({
+		typeDefs: typesArray,
+		resolvers: resolversArray,
+	});
 
-    type Order{
-        date: String!
-        subtotal: Float!
-        items: [OrderItem]
-    }
+	const server = new ApolloServer({
+		schema,
+	});
 
-    type OrderItem{
-        product: Product!
-        quantity: Int!
-    }
-`);
+	await server.start();
+	server.applyMiddleware({app, path: "/graphql"});
 
-const root = {
-	products: [
-		{
-			id: "redshoe",
-			description: "Red Shoe",
-			price: 42.12,
-		},
-		{
-			id: "bluejeans",
-			description: "Blue jeans",
-			price: 55.55,
-		},
-	],
-	orders: [
-		{
-			date: "20055-05-05",
-			subtotal: 90.22,
-			items: [
-				{
-					product: {
-						id: "redshoe",
-						description: "Old Red Shoe",
-						price: 45.11,
-					},
-					quantity: 2,
-				},
-			],
-		},
-	],
-};
-const app = express();
+	app.listen(3000, () => {
+		console.log("Running GraphQL server ....");
+	});
+}
 
-app.use(
-	"/graphql",
-	graphqlHTTP({
-		schema: schema,
-		rootValue: root,
-		graphiql: true,
-	})
-);
-
-app.listen(3000, () => {
-	console.log("Running GraphQL server ....");
-});
+startApolloServer();
